@@ -1,24 +1,47 @@
-node {
-    def app
-    stage('Clone repository') {
-        checkout scm
+pipeline {
+    agent any
+    
+    environment {
+        DOCKER_REGISTRY = 'https://registry.hub.docker.com'
+        DOCKER_CREDENTIALS = 'dockerhub2'
     }
-    stage('Build image') {
-        when {
-            branch 'dev'  
+    
+    stages {
+        stage('Clone repository') {
+            steps {
+                checkout scm
+            }
         }
-        app = docker.build("isidoraaleksicc/kiii")
+
+        stage('Build image') {
+            when {
+                branch 'dev'
+            }
+            steps {
+                script {
+                    app = docker.build("isidoraaleksicc/kiii")
+                }
+            }
+        }
+
+        stage('Push image') {
+            when {
+                branch 'dev'
+            }
+            steps {
+                script {
+                    docker.withRegistry(DOCKER_REGISTRY, DOCKER_CREDENTIALS) {
+                        app.push("${env.BRANCH_NAME}-${env.BUILD_NUMBER}")
+                        app.push("${env.BRANCH_NAME}-latest")
+                    }
+                }
+            }
+        }
     }
 
-    stage('Push image') {
-        when {
-            branch 'dev'  
-        }
-        docker.withRegistry('https://registry.hub.docker.com', 'dockerhub2') {
-            app.push("${env.BRANCH_NAME}-${env.BUILD_NUMBER}")
-            app.push("${env.BRANCH_NAME}-latest")
-          
+    post {
+        failure {
+            echo "Build failed."
         }
     }
 }
-
